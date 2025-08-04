@@ -21,13 +21,15 @@ app.use((req, res, next) => {
 app.use(cors());
 app.use(express.json()); // Middleware to parse JSON
 
+app.get("/", (req, res) => {
+  res.send("Welcome to the Audit Backend API!");
+});
+
 // Define routes
 app.use("/audit", auditController);
 app.use("/user", userController);
 app.use("/comment", commentController);
 app.use("/company", companyController);
-
-// ! VERCEL AUTH KAPALI TEST İÇİN NEYMİŞ ÖĞREN ONA GÖRE AÇ
 
 app.listen(PORT, async () => {
   await dbConnect();
