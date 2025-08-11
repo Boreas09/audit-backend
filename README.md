@@ -54,7 +54,8 @@ A comprehensive backend system for managing security audits of StarkNet smart co
 │   ├── verifySignature.js      # On-chain signature verification
 │   └── loadEnvironment.js      # Environment setup
 ├── validations/             # Input validation rules
-│   ├── auditValidations.js     # Audit & auth validations
+|   ├── validations.js          # Auth validations
+│   ├── auditValidations.js     # Audit  validations
 │   ├── scopeValidations.js     # Scope workflow validations
 │   ├── userValidations.js      # User validations
 │   ├── commentValidations.js   # Comment validations
@@ -407,14 +408,6 @@ POST /user/createUser
 }
 ```
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
 ## 📄 License
 
 This project is licensed under the ISC License.
@@ -432,10 +425,6 @@ This project is licensed under the ISC License.
 - **Validation**: express-validator for input validation
 - **Environment**: dotenv for configuration
 - **CORS**: Cross-origin resource sharing enabled
-
-## 📞 Support
-
-For support, email [support email] or create an issue in the GitHub repository.
 
 ---
 
