@@ -1,122 +1,155 @@
 import express from "express";
 import Audit from "../models/audit.js";
-import { dbConnect } from "../db/mongoDatabase.js";
-import { body, validationResult } from "express-validator";
-import { auditValidationRules } from "../validations/auditValidations.js";
+import mongodb from "../db/mongoDatabase.js";
+import { validationResult } from "express-validator";
+import {
+  auditValidationRules,
+  validateObjectId
+} from "../validations/auditValidations.js";
+import { requireRole, authenticateUser } from "../validations/validations.js";
 
 const router = express.Router();
 
 // Middleware to connect to the database
 const connectDbMiddleware = async (req, res, next) => {
   try {
-    await dbConnect(); // Ensure MongoDB is connected
+    await mongodb.connect(); // Ensure MongoDB is connected
     next();
   } catch (error) {
     return res.status(500).json({ message: "Database connection failed" });
   }
 };
 
-// POST route for creating a new Audit document
-// router.post(
-//   "/postAudit",
-//   connectDbMiddleware,
-//   auditValidationRules,
-//   async (req, res) => {
-//     try {
-//       const errors = validationResult(req);
-//       if (!errors.isEmpty()) {
-//         return res.status(400).json({ errors: errors.array() });
-//       }
-
-//       const body = req.body; // Parse the request body
-//       const audit = new Audit(body); // Create a new Audit document
-
-//       await audit.save(); // Save the new audit to MongoDB
-//       return res
-//         .status(201)
-//         .json({ message: "Audit created successfully", audit });
-//     } catch (error) {
-//       return res.status(500).json({ message: error.message });
-//     }
-//   }
-// );
-
-//! audit post method olmayacak, ilk önce client oluşturulacak, sonra client üzerinden id alınarak audit oluşturulacak
-
-// GET route for retrieving all Audit documents with optional filters
-router.get("/", connectDbMiddleware, async (req, res) => {
-  try {
-    const audits = await Audit.find();
-    return res.status(200).json(audits);
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
-  }
-});
-
-// GET route for retrieving a specific Audit document by ID
-router.get("/:id", connectDbMiddleware, async (req, res) => {
-  try {
-    const { id } = req.params; // Get the ID from the URL parameters
-    const audit = await Audit.findById(id);
-
-    if (!audit) {
-      return res.status(404).json({ message: "Audit not found" });
-    }
-
-    return res.status(200).json(audit);
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
-  }
-});
-
-// PUT route for updating an existing Audit document by ID
-router.put(
-  "/:id",
+// GET /audit/ - Get all audits (admin only)
+router.get(
+  "/",
   connectDbMiddleware,
-  auditValidationRules,
+  requireRole('admin'),
   async (req, res) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
-      }
-
-      const { id } = req.params; // Get the ID from the URL parameters
-      const updateData = req.body; // Parse the request body for update data
-
-      const updatedAudit = await Audit.findByIdAndUpdate(id, updateData, {
-        new: true, // Return the updated document
-        runValidators: true, // Validate the update against the model schema
-      });
-
-      if (!updatedAudit) {
-        return res.status(404).json({ message: "Audit not found" });
-      }
-
-      return res
-        .status(200)
-        .json({ message: "Audit updated successfully", audit: updatedAudit });
+      const audits = await Audit.find();
+      return res.status(200).json(audits);
     } catch (error) {
       return res.status(500).json({ message: error.message });
     }
   }
 );
 
-// DELETE route for deleting an Audit document by ID
-router.delete("/:id", connectDbMiddleware, async (req, res) => {
-  try {
-    const { id } = req.params; // Get the ID from the URL parameters
+// GET /audit/:id - Get audit by ID (any user)
+router.get(
+  "/:id",
+  connectDbMiddleware,
+  requireRole(['admin', 'auditor', 'client']),
+  validateObjectId("id"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const audit = await Audit.findById(id);
 
-    const deletedAudit = await Audit.findByIdAndDelete(id);
+      if (!audit) {
+        return res.status(404).json({ message: "Audit not found" });
+      }
 
-    if (!deletedAudit) {
-      return res.status(404).json({ message: "Audit not found" });
+      return res.status(200).json(audit);
+    } catch (error) {
+      return res.status(500).json({ message: error.message });
     }
-
-    return res.status(200).json({ message: "Audit deleted successfully" });
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
   }
-});
+);
+
+// GET /audit/company/:companyId - Get audits by company
+router.get(
+  "/company/:companyId",
+  connectDbMiddleware,
+  requireRole(['admin', 'auditor', 'client']),
+  validateObjectId("companyId"),
+  async (req, res) => {
+    try {
+      const { companyId } = req.params;
+
+      // Find audits where users from this company are involved
+      const audits = await Audit.find().populate({
+        path: 'customerReportId',
+        match: { companyId: companyId }
+      });
+
+      return res.status(200).json(audits);
+    } catch (error) {
+      return res.status(500).json({ message: error.message });
+    }
+  }
+);
+
+// GET /audit/user/:userId - Get audits by user
+router.get(
+  "/user/:userId",
+  connectDbMiddleware,
+  requireRole(['admin', 'auditor', 'client']),
+  validateObjectId("userId"),
+  async (req, res) => {
+    try {
+      const { userId } = req.params;
+
+      // Find audits where this user is referenced in customerReportId
+      const audits = await Audit.find({
+        $or: [
+          { 'customerReportId': userId }
+        ]
+      });
+
+      return res.status(200).json(audits);
+    } catch (error) {
+      return res.status(500).json({ message: error.message });
+    }
+  }
+);
+
+// GET /audit/user/:userId/company/:companyId - Get audits by user and company
+router.get(
+  "/user/:userId/company/:companyId",
+  connectDbMiddleware,
+  requireRole(['admin', 'auditor', 'client']),
+  validateObjectId("userId"),
+  validateObjectId("companyId"),
+  async (req, res) => {
+    try {
+      const { userId, companyId } = req.params;
+
+      // Find audits where the user is involved AND belongs to the specified company
+      const audits = await Audit.find().populate({
+        path: 'customerReportId',
+        match: {
+          _id: userId,
+          companyId: companyId
+        }
+      });
+
+      return res.status(200).json(audits);
+    } catch (error) {
+      return res.status(500).json({ message: error.message });
+    }
+  }
+);
+
+// GET /audit/search/:name - Search audits by protocol name
+router.get(
+  "/search/:name",
+  requireRole(['admin', 'auditor', 'client']),
+  connectDbMiddleware,
+  async (req, res) => {
+    try {
+      const { name } = req.params;
+
+      // Search by protocol name (case insensitive)
+      const audits = await Audit.find({
+        'summary.protocol': { $regex: name, $options: 'i' }
+      });
+
+      return res.status(200).json(audits);
+    } catch (error) {
+      return res.status(500).json({ message: error.message });
+    }
+  }
+);
 
 export default router;

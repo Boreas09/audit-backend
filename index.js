@@ -6,6 +6,7 @@ import auditController from "./api/auditController.js";
 import userController from "./api/userController.js";
 import commentController from "./api/commentController.js";
 import companyController from "./api/companyController.js";
+import scopeController from "./api/scopeController.js";
 import cors from "cors";
 
 const app = express();
@@ -30,6 +31,7 @@ app.use("/audit", auditController);
 app.use("/user", userController);
 app.use("/comment", commentController);
 app.use("/company", companyController);
+app.use("/scope", scopeController);
 
 app.listen(PORT, async () => {
   await dbConnect();
